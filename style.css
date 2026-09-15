@@ -8,3 +8,10 @@
 
 
 .elapsed-live b{color:#18e6b4;white-space:nowrap;font-size:23px}@media(max-width:1000px){.command{flex-wrap:wrap}.metrics{flex-wrap:wrap;gap:16px}.elapsed-live b{font-size:21px}}
+
+#eligible path{fill:#eef0ef;stroke:#273c4b;stroke-width:.65;stroke-linejoin:round;pointer-events:none}
+#startPanel .panel-inner{width:min(960px,94%)}#regionPicker{border:0;padding:0;margin:20px 0 0}#regionPicker[hidden]{display:none}#regionPicker legend{font-size:14px;color:#c8d0d3;margin-bottom:10px}.region-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.panel .region-card{margin:0;display:flex;align-items:center;gap:10px;padding:18px 14px;min-height:76px;border:2px solid #52626e;border-radius:6px;background:#1d2d37;cursor:pointer;line-height:1.6}.region-card:has(input:checked){border-color:#18e6b4;background:#173b39}.region-card input{width:18px;height:18px;accent-color:#18e6b4;flex-shrink:0}.region-card:focus-within{outline:2px solid #fff;outline-offset:2px}#selectionCount{margin-top:12px;color:#18e6b4;font-size:14px}.settings-row{display:grid;grid-template-columns:1fr 1fr;gap:20px}#startPanel #modeHelp{min-height:0}.metrics{flex-shrink:0}
+@media(max-width:700px){.region-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.panel .region-card{padding:10px;font-size:13px}.settings-row{gap:12px}}
+
+#scopeHelp{font-size:14px;margin-top:12px;color:#c9b486}#scopeHelp[hidden]{display:none}

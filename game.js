@@ -1,6 +1,34 @@
 const $=id=>document.getElementById(id);
-const [MAP_W,MAP_H]=MAP_SIZE;
-const countries=COUNTRIES.map(c=>({...c,polys:c.polys.map(p=>p.split(' ').map(v=>v.split(',').map(Number)))}));
+let MAP_W,MAP_H,countries=[],viewBounds;
+const parseCountry=c=>({...c,polys:c.polys.map(p=>p.split(' ').map(v=>v.split(',').map(Number)))});
+function selectedGroups(){return REGION_GROUPS.filter(g=>$('region-'+g.id).checked).map(g=>g.id)}
+function pool(){
+ if($('scope').value==='hre')return HRE_COUNTRIES;
+ if($('scope').value==='roman')return ROMAN_COUNTRIES;
+ const groups=selectedGroups();
+ return WORLD_COUNTRIES.filter(c=>groups.some(g=>c.parts[g])).map(c=>{
+  const keys=groups.filter(g=>c.parts[g]);const parts=keys.map(g=>c.parts[g]);
+  if(keys.length>1)return {tag:c.tag,name:c.name,...c.variants[keys.sort().join('|')]};
+  return {tag:c.tag,name:c.name,polys:parts.flatMap(p=>p.polys),d:parts.map(p=>p.d).join(''),sample:parts[0].sample,bounds:[Math.min(...parts.map(p=>p.bounds[0])),Math.min(...parts.map(p=>p.bounds[1])),Math.max(...parts.map(p=>p.bounds[2])),Math.max(...parts.map(p=>p.bounds[3]))]};
+ });
+}
+function configureMap(){
+ const hre=$('scope').value==='hre';[MAP_W,MAP_H]=hre?HRE_SIZE:WORLD_SIZE;countries=pool().map(parseCountry);
+ viewBounds=hre||!countries.length?[0,0,MAP_W,MAP_H]:[Math.min(...countries.map(c=>c.bounds[0]))-20,Math.min(...countries.map(c=>c.bounds[1]))-20,Math.max(...countries.map(c=>c.bounds[2]))+20,Math.max(...countries.map(c=>c.bounds[3]))+20];
+ $('mapImage').src=hre?'europe.svg':'world.svg';$('mapImage').alt='1444 年无字地图；浅色区域可以作答，深灰色区域不出题';
+ $('map').style.width=MAP_W+'px';$('map').style.height=MAP_H+'px';$('overlay').setAttribute('viewBox',`0 0 ${MAP_W} ${MAP_H}`);
+ $('eligible').replaceChildren();
+ if(!hre)for(const c of countries){const el=document.createElementNS('http://www.w3.org/2000/svg','path');el.setAttribute('d',c.d);el.setAttribute('fill-rule','evenodd');$('eligible').append(el)}
+ $('edition').textContent=hre?'神罗与周边 · 84 国专项':$('scope').value==='roman'?`罗马帝国 · ${countries.length} 国`:`自选大区 · ${countries.length} 国`;fit();
+}
+function updateSetup(){
+ $('scopeHelp').hidden=$('scope').value!=='roman';
+ $('target').textContent=$('scope').value==='hre'?'神罗小国，你认识多少？':$('scope').value==='roman'?'重返罗马的疆域':'选择大区，探索世界';
+ const n=pool().length;$('regionPicker').hidden=$('scope').value!=='regions';$('start').disabled=!n;
+ $('selectionCount').textContent=n?`已选 ${selectedGroups().length} 个大区 · 去重后 ${n} 个国家`:'请至少勾选一个大区';
+ $('modeHelp').textContent=$('mode').value==='clear'?`全部 ${n} 个国家各答一次，答错或超时也会填色。`:`随机抽取 ${Math.min(30,n)} 个不同国家；不足 30 国时全部出题。`;
+ $('coverage').textContent=$('scope').value==='roman'?`决议范围 ${ROMAN_PROVINCE_COUNT} 个省份 · ${n} 国 · 1444 年开局领土`:`当前题库 ${n} 国 · 1444 年 11 月 11 日`;configureMap();stats();
+}
 function inside(x,y,p){let hit=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const [a,b]=p[i],[c,d]=p[j];if((b>y)!=(d>y)&&x<(c-a)*(y-b)/(d-b)+a)hit=!hit}return hit}
 function contains(c,x,y){return c.polys.reduce((hit,p)=>hit!==inside(x,y,p),false)}
 let queue=[],index=0,score=0,active=false,deadline=0,seconds=20,missed=[],timer;
@@ -8,8 +36,8 @@ let gameStartedAt=0,gameEndedAt=null;
 let completed=new Map(),currentMark=null,soundEnabled=true,audioContext=null;
 let scale=1,base=1,tx=0,ty=0,gesture=null;
 function transform(){$('map').style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;$('zoom').textContent=Math.round(scale/base*100)+'%'}
-function fit(){base=Math.min($('viewport').clientWidth/MAP_W,$('viewport').clientHeight/MAP_H);scale=base;tx=($('viewport').clientWidth-MAP_W*scale)/2;ty=($('viewport').clientHeight-MAP_H*scale)/2;transform()}
-function zoom(f,x=$('viewport').clientWidth/2,y=$('viewport').clientHeight/2){const s=Math.min(base*16,Math.max(base,scale*f));tx=x-(x-tx)*s/scale;ty=y-(y-ty)*s/scale;scale=s;transform()}
+function fit(){const [x0,y0,x1,y1]=viewBounds;const w=x1-x0,h=y1-y0;base=Math.min($('viewport').clientWidth/w,$('viewport').clientHeight/h);scale=base;tx=($('viewport').clientWidth-w*scale)/2-x0*scale;ty=($('viewport').clientHeight-h*scale)/2-y0*scale;transform()}
+function zoom(f,x=$('viewport').clientWidth/2,y=$('viewport').clientHeight/2){const s=Math.min(base*128,Math.max(base,scale*f));tx=x-(x-tx)*s/scale;ty=y-(y-ty)*s/scale;scale=s;transform()}
 function unlockAudio(){if(!soundEnabled)return;try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;if(!audioContext)audioContext=new Audio();if(audioContext.state==='suspended')audioContext.resume().catch(()=>{})}catch{}}
 function successSound(){
   if(!soundEnabled||!audioContext)return;
@@ -22,9 +50,9 @@ function updateElapsed(){$('liveElapsed').textContent=formatElapsed(queue.length
 function tick(){updateElapsed();if(!active)return;if(!seconds){$('time').textContent='不限时';$('progress').style.width='100%';return}const left=Math.max(0,(deadline-performance.now())/1000);$('time').innerHTML=Math.ceil(left)+'<span>秒</span>';$('progress').style.width=left/seconds*100+'%';if(!left)finish(false,'时间到');}
 function ask(){active=true;if(currentMark)currentMark.classList.remove('current');$('pin').setAttribute('display','none');$('target').textContent=queue[index].name;$('eyebrow').textContent='请在地图上找到';$('round').textContent=`${index+1} / ${queue.length}`;$('message').textContent='点击浅色领土作答；已上色区域不会再次结算。';$('next').disabled=true;$('next').textContent=index===queue.length-1?'查看成绩 →':'下一题 →';deadline=performance.now()+seconds*1000;tick();}
 function start(){
-  clearInterval(timer);unlockAudio();gameStartedAt=performance.now();gameEndedAt=null;seconds=Number($('duration').value);queue=[...countries];
+  if(!pool().length)return;configureMap();clearInterval(timer);unlockAudio();gameStartedAt=performance.now();gameEndedAt=null;seconds=Number($('duration').value);queue=[...countries];
   for(let i=queue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[queue[i],queue[j]]=[queue[j],queue[i]]}
-  if($('mode').value==='challenge')queue=queue.slice(0,10);
+  if($('mode').value==='challenge')queue=queue.slice(0,30);
   index=0;score=0;missed=[];completed=new Map();currentMark=null;$('reveal').replaceChildren();stats();$('startPanel').hidden=true;$('resultPanel').hidden=true;fit();ask();timer=setInterval(tick,75);
 }
 function finish(correct,prefix){
@@ -33,7 +61,7 @@ function finish(correct,prefix){
   const el=document.createElementNS('http://www.w3.org/2000/svg','path');el.setAttribute('d',target.d);el.setAttribute('fill-rule','evenodd');el.setAttribute('class',`${correct?'correct':'incorrect'} current`);el.setAttribute('data-country',target.tag);$('reveal').append(el);currentMark=el;$('next').disabled=false;
 }
 function answer(x,y){
-  if(!active)return;if(seconds&&performance.now()>=deadline){tick();return}const clicked=countries.find(c=>contains(c,x,y));
+  if(!active)return;if(seconds&&performance.now()>=deadline){tick();return}const clicked=countries.find(c=>(!c.bounds||(x>=c.bounds[0]&&x<=c.bounds[2]&&y>=c.bounds[1]&&y<=c.bounds[3]))&&contains(c,x,y));
   if(!clicked){$('message').textContent='深灰色和海面不出题，请点击尚未上色的浅色领土。';return}
   if(completed.has(clicked.tag)){$('message').textContent='这片领土已经完成，不重复计分。请寻找当前目标。';return}
   unlockAudio();$('pin').setAttribute('cx',x);$('pin').setAttribute('cy',y);$('pin').setAttribute('display','block');finish(clicked.tag===queue[index].tag,'没有点中');
@@ -47,13 +75,14 @@ window.addEventListener('keydown',e=>{
   if(!e.repeat&&!$('next').disabled)$('next').click();
 });
 $('start').onclick=start;$('again').onclick=start;$('viewMap').onclick=()=>{$('resultPanel').hidden=true};
-$('restart').onclick=()=>{active=false;clearInterval(timer);queue=[];index=0;score=0;completed=new Map();currentMark=null;updateElapsed();stats();$('startPanel').hidden=false;$('resultPanel').hidden=true;$('reveal').replaceChildren();$('pin').setAttribute('display','none');$('next').disabled=true;$('target').textContent='神罗小国，你认识多少？';$('eyebrow').textContent='准备探索';$('message').textContent='只考浅色区域；深灰色地区不进入题库。';$('round').textContent='—';$('time').textContent=Number($('duration').value)?$('duration').value+' 秒':'不限时';$('progress').style.width='100%';fit()};
-$('mode').onchange=()=>{$('duration').value=$('mode').value==='clear'?'0':'20';$('modeHelp').textContent=$('mode').value==='clear'?`全部 ${countries.length} 个国家各答一次，答错也会填色，直至整张题库地图完成。`:'随机抽取 10 个不同国家，适合短时练习。'};
+$('restart').onclick=()=>{active=false;clearInterval(timer);queue=[];index=0;score=0;completed=new Map();currentMark=null;updateElapsed();stats();$('startPanel').hidden=false;$('resultPanel').hidden=true;$('reveal').replaceChildren();$('pin').setAttribute('display','none');$('next').disabled=true;$('target').textContent='选择题库，开始探索';$('eyebrow').textContent='准备探索';$('message').textContent='只考浅色区域；深灰色地区不进入题库。';$('round').textContent='—';$('time').textContent=Number($('duration').value)?$('duration').value+' 秒':'不限时';$('progress').style.width='100%';fit()};
+$('mode').onchange=updateSetup;$('scope').onchange=updateSetup;
 $('sound').onclick=()=>{soundEnabled=!soundEnabled;$('sound').textContent=soundEnabled?'音效：开':'音效：关';$('sound').setAttribute('aria-pressed',String(soundEnabled));if(soundEnabled)unlockAudio()};
 $('zoomIn').onclick=()=>zoom(1.35);$('zoomOut').onclick=()=>zoom(1/1.35);$('fit').onclick=fit;
 $('viewport').addEventListener('wheel',e=>{e.preventDefault();const r=$('viewport').getBoundingClientRect();zoom(e.deltaY<0?1.15:1/1.15,e.clientX-r.left,e.clientY-r.top)},{passive:false});
 $('viewport').onpointerdown=e=>{if(gesture)return;gesture={id:e.pointerId,x:e.clientX,y:e.clientY,tx,ty,moved:false};$('viewport').setPointerCapture(e.pointerId)};
 $('viewport').onpointermove=e=>{if(!gesture||gesture.id!==e.pointerId)return;const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;if(Math.hypot(dx,dy)>6)gesture.moved=true;if(gesture.moved){tx=gesture.tx+dx;ty=gesture.ty+dy;transform()}};
 $('viewport').onpointerup=e=>{if(!gesture||gesture.id!==e.pointerId)return;const moved=gesture.moved;gesture=null;if(!moved){const r=$('viewport').getBoundingClientRect();answer((e.clientX-r.left-tx)/scale,(e.clientY-r.top-ty)/scale)}};
-$('viewport').onpointercancel=()=>{gesture=null};window.addEventListener('resize',fit);$('map').style.width=MAP_W+'px';$('map').style.height=MAP_H+'px';$('overlay').setAttribute('viewBox',`0 0 ${MAP_W} ${MAP_H}`);$('coverage').textContent=`${countries.length} 个国家 · 1444 年 11 月 11 日`;stats();fit();
-if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'start_map_challenge',description:'按当前选择的模式开始神罗国家挑战，重置成绩和已完成填色。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},execute:input=>{if(!input||Object.keys(input).length)throw new Error('不接受参数');start();return {country:queue[0].name,seconds,rounds:queue.length,mode:$('mode').value}}})).catch(()=>{})}catch{}}
+$('viewport').onpointercancel=()=>{gesture=null};window.addEventListener('resize',fit);for(const g of REGION_GROUPS){const label=document.createElement('label');label.className='region-card';const input=document.createElement('input');input.type='checkbox';input.id='region-'+g.id;input.checked=g.id==='europe';input.onchange=updateSetup;const text=document.createElement('span');text.textContent=`${g.name}（${g.count} 国家）`;label.append(input,text);$('regionCards').append(label)}updateSetup();
+
+if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'start_map_challenge',description:'按当前选择的模式开始地图国家挑战，重置成绩和已完成填色。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},execute:input=>{if(!input||Object.keys(input).length)throw new Error('不接受参数');if(!pool().length)throw new Error('请至少勾选一个大区');start();return {country:queue[0].name,seconds,rounds:queue.length,mode:$('mode').value}}})).catch(()=>{})}catch{}}
