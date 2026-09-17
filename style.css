@@ -30,3 +30,5 @@
 .question-heading{display:flex;align-items:center;gap:16px;min-height:58px}#targetFlag{display:block;object-fit:contain;margin:5px 0;border:1px solid #897653;box-shadow:0 2px 8px #0005}#targetFlag[hidden],#target[hidden]{display:none}#questionTypeHelp{font-size:14px;color:#aab8bf;line-height:1.5;margin:8px 0 0}@media(max-width:700px){#targetFlag{width:64px;height:64px}.question-heading{gap:10px}}
 
 .answer-slot{display:inline-grid}.answer-slot>button{grid-area:1/1;min-width:132px;min-height:46px}.answer-slot:has(#confirmAnswer:not([hidden])) #next{visibility:hidden}
+
+#countryTooltip{display:flex;align-items:center;gap:10px;max-width:calc(100% - 8px);white-space:normal}#tooltipFlag{object-fit:contain;flex-shrink:0}

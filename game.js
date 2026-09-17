@@ -65,7 +65,7 @@ function hoverCountry(e){
  const r=$('viewport').getBoundingClientRect(),x=(e.clientX-r.left-tx)/scale,y=(e.clientY-r.top-ty)/scale;
  const c=atlasCountries().find(c=>x>=c.bounds[0]&&x<=c.bounds[2]&&y>=c.bounds[1]&&y<=c.bounds[3]&&contains(c,x,y));
  $('countryTooltip').hidden=!c;
- if(c){$('countryTooltip').textContent=c.name;$('countryTooltip').style.left=Math.max(4,Math.min(e.clientX-r.left+16,$('viewport').clientWidth-180))+'px';$('countryTooltip').style.top=Math.max(4,Math.min(e.clientY-r.top+16,$('viewport').clientHeight-42))+'px'}
+ if(c){$('tooltipName').textContent=c.name;const flagPath=`flags/${c.tag}.png`;if($('tooltipFlag').getAttribute('src')!==flagPath)$('tooltipFlag').setAttribute('src',flagPath);$('countryTooltip').style.left=Math.max(4,Math.min(e.clientX-r.left+16,$('viewport').clientWidth-$('countryTooltip').offsetWidth-4))+'px';$('countryTooltip').style.top=Math.max(4,Math.min(e.clientY-r.top+16,$('viewport').clientHeight-$('countryTooltip').offsetHeight-4))+'px'}
 }
 
 function paintCountries(){
