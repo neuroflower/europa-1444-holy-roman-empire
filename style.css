@@ -32,3 +32,5 @@
 .answer-slot{display:inline-grid}.answer-slot>button{grid-area:1/1;min-width:132px;min-height:46px}.answer-slot:has(#confirmAnswer:not([hidden])) #next{visibility:hidden}
 
 #countryTooltip{display:flex;align-items:center;gap:10px;max-width:calc(100% - 8px);white-space:normal}#tooltipFlag{object-fit:contain;flex-shrink:0}
+
+#english{font-size:14px;white-space:nowrap}#target{overflow-wrap:anywhere}.question{min-width:0}@media(max-width:700px){header{height:auto;min-height:66px;flex-wrap:wrap;padding:10px 12px;gap:6px}header button{margin-left:0}header #english{margin-left:auto}.question-heading{flex-wrap:wrap}}

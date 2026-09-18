@@ -1,6 +1,18 @@
 const $=id=>document.getElementById(id);
 let MAP_W,MAP_H,countries=[],viewBounds;
-let colorful=true;
+let colorful=true,englishEnabled=false,tooltipCountry=null,answerFeedback=null;
+function countryName(c){return englishEnabled?`${c.name} / ${COUNTRY_ENGLISH[c.tag]}`:c.name}
+function labelText(el,c,label){
+ el.textContent=c.name;
+ if(englishEnabled){
+  const line=document.createElementNS('http://www.w3.org/2000/svg','tspan');
+  line.textContent=COUNTRY_ENGLISH[c.tag];line.setAttribute('x',label.x);line.setAttribute('dy','1.3em');
+  line.setAttribute('font-size',Math.min(.65,c.name.length*1.7/line.textContent.length)+'em');el.append(line);
+ }
+}
+function feedbackText(){const {correct,prefix}=answerFeedback,c=queue[index];return correct?`答对了！${countryName(c)} 已标为青绿色斜纹。`:`${prefix}；${countryName(c)} 已标为亮粉色斜纹，请记住它的位置。`}
+function reviewText(){return missed.length?'可以再记一记：'+missed.map(countryName).join('、'):'全部答对！'}
+
 function setTarget(text,tag=null){
  $('target').textContent=text;$('target').hidden=!text;$('targetFlag').hidden=!tag;
  if(tag)$('targetFlag').src=`flags/${tag}.png`;
@@ -45,7 +57,7 @@ function enterBrowse(after=false){
  $('pin').setAttribute('display','none');$('countryLabels').replaceChildren();labelNodes=[];labelScale=null;
  for(const c of atlasCountries()){
   const label=ATLAS_LABELS[c.tag],el=document.createElementNS('http://www.w3.org/2000/svg','text');
-  el.textContent=c.name;el.setAttribute('x',label.x);el.setAttribute('y',label.y);$('countryLabels').append(el);labelNodes.push({el,label});
+  labelText(el,c,label);el.setAttribute('x',label.x);el.setAttribute('y',label.y);$('countryLabels').append(el);labelNodes.push({el,label,c});
  }
  $('startPanel').hidden=true;$('resultPanel').hidden=true;$('browseBar').hidden=false;$('browseStart').hidden=after;
  $('browseBack').textContent=after?'返回成绩':'返回设置';
@@ -65,7 +77,7 @@ function hoverCountry(e){
  const r=$('viewport').getBoundingClientRect(),x=(e.clientX-r.left-tx)/scale,y=(e.clientY-r.top-ty)/scale;
  const c=atlasCountries().find(c=>x>=c.bounds[0]&&x<=c.bounds[2]&&y>=c.bounds[1]&&y<=c.bounds[3]&&contains(c,x,y));
  $('countryTooltip').hidden=!c;
- if(c){$('tooltipName').textContent=c.name;const flagPath=`flags/${c.tag}.png`;if($('tooltipFlag').getAttribute('src')!==flagPath)$('tooltipFlag').setAttribute('src',flagPath);$('countryTooltip').style.left=Math.max(4,Math.min(e.clientX-r.left+16,$('viewport').clientWidth-$('countryTooltip').offsetWidth-4))+'px';$('countryTooltip').style.top=Math.max(4,Math.min(e.clientY-r.top+16,$('viewport').clientHeight-$('countryTooltip').offsetHeight-4))+'px'}
+ if(c){tooltipCountry=c;$('tooltipName').textContent=countryName(c);const flagPath=`flags/${c.tag}.png`;if($('tooltipFlag').getAttribute('src')!==flagPath)$('tooltipFlag').setAttribute('src',flagPath);$('countryTooltip').style.left=Math.max(4,Math.min(e.clientX-r.left+16,$('viewport').clientWidth-$('countryTooltip').offsetWidth-4))+'px';$('countryTooltip').style.top=Math.max(4,Math.min(e.clientY-r.top+16,$('viewport').clientHeight-$('countryTooltip').offsetHeight-4))+'px'}
 }
 
 function paintCountries(){
@@ -135,7 +147,7 @@ function formatElapsed(ms){const total=Math.max(0,Math.floor(ms/1000)),hours=Mat
 function stats(){$('score').textContent=score;$('accuracy').textContent=accuracy();$('cleared').textContent=`已完成 ${completed.size} / ${queue.length||countries.length}`}
 function updateElapsed(){$('liveElapsed').textContent=formatElapsed(queue.length?(gameEndedAt??performance.now())-gameStartedAt:0)}
 function tick(){updateElapsed();if(!active)return;if(!seconds){$('time').textContent='不限时';$('progress').style.width='100%';return}const left=Math.max(0,(deadline-performance.now())/1000);$('time').innerHTML=Math.ceil(left)+'<span>秒</span>';$('progress').style.width=left/seconds*100+'%';if(!left)finish(false,'时间到');}
-function ask(){active=true;clearPending();$('confirmAnswer').hidden=!needsConfirmation();if(currentMark)currentMark.classList.remove('current');$('pin').setAttribute('display','none');const flag=$('questionType').value==='flag';setTarget(flag?'':queue[index].name,flag?queue[index].tag:null);$('eyebrow').textContent=flag?'请找到这面旗帜所属国家':'请在地图上找到';$('round').textContent=`${index+1} / ${queue.length}`;$('message').textContent=needsConfirmation()?'先点选领土，再点“确认作答”；确认前可以更换选择。':'点击国家领土作答；带斜线的已答区域不会再次结算。';$('next').disabled=true;$('next').textContent=index===queue.length-1?'查看成绩 →':'下一题 →';deadline=performance.now()+seconds*1000;tick();}
+function ask(){active=true;answerFeedback=null;clearPending();$('confirmAnswer').hidden=!needsConfirmation();if(currentMark)currentMark.classList.remove('current');$('pin').setAttribute('display','none');const flag=$('questionType').value==='flag';setTarget(flag?'':countryName(queue[index]),flag?queue[index].tag:null);$('eyebrow').textContent=flag?'请找到这面旗帜所属国家':'请在地图上找到';$('round').textContent=`${index+1} / ${queue.length}`;$('message').textContent=needsConfirmation()?'先点选领土，再点“确认作答”；确认前可以更换选择。':'点击国家领土作答；带斜线的已答区域不会再次结算。';$('next').disabled=true;$('next').textContent=index===queue.length-1?'查看成绩 →':'下一题 →';deadline=performance.now()+seconds*1000;tick();}
 function start(){
   if(!pool().length)return;leaveBrowse(false);configureMap();clearInterval(timer);unlockAudio();gameStartedAt=performance.now();gameEndedAt=null;seconds=Number($('duration').value);queue=[...countries];
   for(let i=queue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[queue[i],queue[j]]=[queue[j],queue[i]]}
@@ -143,8 +155,8 @@ function start(){
   index=0;score=0;missed=[];completed=new Map();currentMark=null;$('reveal').replaceChildren();stats();$('startPanel').hidden=true;$('resultPanel').hidden=true;fit();ask();timer=setInterval(tick,75);
 }
 function finish(correct,prefix){
-  if(!active)return;active=false;clearPending();$('confirmAnswer').hidden=true;if(index===queue.length-1)gameEndedAt=performance.now();updateElapsed();const target=queue[index];if($('questionType').value==='flag')setTarget(target.name,target.tag);completed.set(target.tag,correct);if(correct){score++;successSound()}else missed.push(target.name);
-  stats();$('eyebrow').textContent=correct?'✓ 定位成功':'本题已结算';$('message').textContent=correct?`答对了！${target.name} 已标为青绿色斜纹。`:`${prefix}；${target.name} 已标为亮粉色斜纹，请记住它的位置。`;
+  if(!active)return;active=false;clearPending();$('confirmAnswer').hidden=true;if(index===queue.length-1)gameEndedAt=performance.now();updateElapsed();const target=queue[index];if($('questionType').value==='flag')setTarget(countryName(target),target.tag);completed.set(target.tag,correct);if(correct){score++;successSound()}else missed.push(target);
+  answerFeedback={correct,prefix};stats();$('eyebrow').textContent=correct?'✓ 定位成功':'本题已结算';$('message').textContent=feedbackText();
   const el=document.createElementNS('http://www.w3.org/2000/svg','path');el.setAttribute('d',target.d);el.setAttribute('fill-rule','evenodd');el.setAttribute('class',`${correct?'correct':'incorrect'} current`);el.setAttribute('data-country',target.tag);$('reveal').append(el);currentMark=el;$('next').disabled=false;
 }
 function answer(x,y,confirmed=false){
@@ -154,7 +166,7 @@ function answer(x,y,confirmed=false){
   if(needsConfirmation()&&!confirmed){pendingAnswer={x,y};$('selection').setAttribute('d',clicked.d);$('pin').setAttribute('cx',x);$('pin').setAttribute('cy',y);$('pin').setAttribute('display','block');$('confirmAnswer').hidden=false;$('confirmAnswer').disabled=false;$('message').textContent='已选中描边领土，可重新点选；点“确认作答”提交。';return}
   unlockAudio();$('pin').setAttribute('cx',x);$('pin').setAttribute('cy',y);$('pin').setAttribute('display','block');finish(clicked.tag===queue[index].tag,'没有点中');
 }
-function showResults(){clearInterval(timer);active=false;$('resultPanel').hidden=false;$('finalScore').textContent=accuracy();$('totalElapsed').textContent=formatElapsed((gameEndedAt??performance.now())-gameStartedAt);$('resultTitle').textContent=$('mode').value==='clear'?'地图清空完成':'本轮挑战完成';$('summary').textContent=`答对 ${score} / ${queue.length}，答错或超时 ${queue.length-score}。`;$('review').textContent=missed.length?'可以再记一记：'+missed.join('、'):'全部答对！';$('next').disabled=true;setTarget('本局完成');$('eyebrow').textContent='正确率 '+accuracy();$('message').textContent='本局填色已保留，可继续放大查看。';}
+function showResults(){clearInterval(timer);active=false;$('resultPanel').hidden=false;$('finalScore').textContent=accuracy();$('totalElapsed').textContent=formatElapsed((gameEndedAt??performance.now())-gameStartedAt);$('resultTitle').textContent=$('mode').value==='clear'?'地图清空完成':'本轮挑战完成';$('summary').textContent=`答对 ${score} / ${queue.length}，答错或超时 ${queue.length-score}。`;$('review').textContent=reviewText();$('next').disabled=true;setTarget('本局完成');$('eyebrow').textContent='正确率 '+accuracy();$('message').textContent='本局填色已保留，可继续放大查看。';}
 $('confirmAnswer').onclick=()=>{if(pendingAnswer&&active&&!browsing){const {x,y}=pendingAnswer;answer(x,y,true)}};
 $('next').onclick=()=>{if(active||!queue.length||index>=queue.length)return;if(++index<queue.length)ask();else showResults()};
 window.addEventListener('keydown',e=>{
@@ -167,6 +179,16 @@ $('start').onclick=start;$('again').onclick=start;$('viewMap').onclick=()=>enter
 $('browseBefore').onclick=()=>enterBrowse(false);$('browseBack').onclick=()=>leaveBrowse();$('browseStart').onclick=start;
 $('restart').onclick=()=>{leaveBrowse(false);active=false;clearPending();$('confirmAnswer').hidden=true;clearInterval(timer);queue=[];index=0;score=0;completed=new Map();currentMark=null;updateElapsed();stats();$('startPanel').hidden=false;$('resultPanel').hidden=true;$('reveal').replaceChildren();$('pin').setAttribute('display','none');$('next').disabled=true;setTarget('选择题库，开始探索');$('eyebrow').textContent='准备探索';$('message').textContent='只考题库国家；深灰色地区不进入题库。';$('round').textContent='—';$('time').textContent=Number($('duration').value)?$('duration').value+' 秒':'不限时';$('progress').style.width='100%';fit()};
 $('mode').onchange=updateSetup;$('scope').onchange=updateSetup;
+$('english').onclick=()=>{
+ englishEnabled=!englishEnabled;$('english').textContent=englishEnabled?'英语：开':'英语：关';$('english').setAttribute('aria-pressed',String(englishEnabled));
+ if(!browsing&&queue.length&&index<queue.length){
+  const flag=$('questionType').value==='flag';setTarget(flag&&active?'':countryName(queue[index]),flag?queue[index].tag:null);
+  if(!active&&answerFeedback)$('message').textContent=feedbackText();
+ }
+ for(const {el,c,label} of labelNodes)labelText(el,c,label);
+ if(tooltipCountry&&!$('countryTooltip').hidden)$('tooltipName').textContent=countryName(tooltipCountry);
+ $('review').textContent=reviewText();
+};
 $('palette').onclick=()=>{colorful=!colorful;$('palette').textContent=colorful?'配色：彩色':'配色：灰白';$('palette').setAttribute('aria-pressed',String(colorful));paintCountries()};
 $('sound').onclick=()=>{soundEnabled=!soundEnabled;$('sound').textContent=soundEnabled?'音效：开':'音效：关';$('sound').setAttribute('aria-pressed',String(soundEnabled));if(soundEnabled)unlockAudio()};
 $('zoomIn').onclick=()=>zoom(1.35);$('zoomOut').onclick=()=>zoom(1/1.35);$('fit').onclick=fit;
